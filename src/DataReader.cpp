@@ -1,5 +1,5 @@
 #pragma once
-#include "DataReader.hpp"
+#include "include/DataReader.hpp"
 #include <fstream>
 #include <iostream>
 #include <cstdint>
@@ -19,7 +19,7 @@ void DataReaderBinary(const char*filename, std::vector<float> &data, uint32_t* c
     file.read(reinterpret_cast<char*>(&rows), sizeof(rows));
     file.read(reinterpret_cast<char*>(&col), sizeof(col));
     //Modifico el tamaño del vector según el tamaño de los datos del fichero y poder leer todo con read.
-    data.resize(rows * col);
+    data.resize(*rows * *col); //COMPROBAR ARREGLO (porque con puntero)
     //Leo los datos y los almaceno en Data.
     file.read(reinterpret_cast<char*>(&data), sizeof(data));
     //Cierro el fichero.

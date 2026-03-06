@@ -29,10 +29,9 @@ void printMatrixConsole(const std::vector<float>& data, uint32_t nRows, uint32_t
 int main() {
     srand((unsigned int)time(0)); // Semilla
 
-    int nClusters = 16;
-    int nPointsPerCluster = 1000;
+
     int nSize = 5; // dimensiones del punto
-    int totalPoints = nClusters * nPointsPerCluster;
+    int totalPoints = 1000000;
 
     // Vector vacío
     std::vector<float> data;
@@ -41,7 +40,7 @@ int main() {
     generateRandomPoints(data, nSize, totalPoints, 20.0f, -20.0f);
 
     // Guardar en archivo binario
-    FILE* file = fopen("Data/datos", "wb");    
+    FILE* file = fopen("../Data/datos.bin", "wb");
     if (!file) {
         std::cerr << "Error al abrir el archivo para escritura\n";
         return 1;
@@ -57,7 +56,7 @@ int main() {
     fclose(file);
 
     // Imprimir los puntos por consola
-    printMatrixConsole(data, nRows, nCols);
+    //printMatrixConsole(data, nRows, nCols);
 
     return 0;
 }

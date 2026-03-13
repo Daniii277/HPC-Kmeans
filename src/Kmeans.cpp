@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <ctime>
 #include <iostream>
+#include <climits>
+
 
 kMeans::kMeans(uint32_t k): numClusters(k) {}
 
@@ -18,72 +20,95 @@ float kMeans::DistanceCalculator(const float* p1, const float* p2, uint32_t dim)
 
 
 
-void kMeans::run(const std::vector<float>& data, uint32_t cols, uint32_t rows, std::vector<float>& centroids, std::vector<uint32_t>& assignments){
-        uint32_t iter = 0;
-        float tolerance = 100.0f;
-        uint32_t changes = 0;
-        //Mientras se cumplan los requisitos para seguir iterando en el bucle del algoritmo.
-        while(iter < maxIter && tolerance > 5){
-            //Para cada punto comprobamos su centroide más cercano
-            for(uint32_t i = 0; i < rows; i++){
-                uint32_t minDist = 1000; //Numero alto al principio, ya que queremos guardar la distancia más corta.
-                int asignacion = -1;
-                //Para cada centroide / cluster.
-                int nPoint = 0; //variable para indicar en que punto nos encontramos para la funcion de distancia.
-                for(uint32_t j = 0; j < numClusters; j++){
-                    int dist = DistanceCalculator(&centroids[j], &data[nPoint], cols);
-                    if(dist < minDist){
-                        //Asigno la nueva distancia mínima
-                        minDist = dist;
-                        //Indico a que centroide está asignado el punto.
-                        asignacion = j;
-                        if(assignments[i] != asignacion){
-                            assignments[i] = asignacion;
-                            changes++;
-                        }
-                    }
-                    nPoint += cols; //Actualizo el valor para la posición del primer valor del punto.
-                    //std::cout << "Esto es la iteracion de puntos: " + i;
-                }
+void kMeans::run(const std::vector<float>& data, uint32_t cols, uint32_t rows,
+                 std::vector<float>& centroids, std::vector<uint32_t>& assignments)
+{
+    const uint32_t maxIterations = 2000;
+    uint32_t iter = 0;
+    uint32_t changes = rows;
 
+    if(assignments.size() != rows)
+        assignments.resize(rows, UINT32_MAX);
+
+    std::vector<float> sums(numClusters * cols);
+    std::vector<uint32_t> counts(numClusters);
+
+    while(iter < maxIterations)
+    {
+        std::cout << "\nIteración : " << iter << std::endl;
+
+        changes = 0;
+
+        std::fill(sums.begin(), sums.end(), 0.0f);
+        std::fill(counts.begin(), counts.end(), 0);
+
+        // ======================
+        // ASIGNACION DE CLUSTERS
+        // ======================
+        for(uint32_t i = 0; i < rows; i++)
+        {
+            uint32_t bestCluster = 0;
+            uint32_t minDist = UINT32_MAX;
+
+            uint32_t pointIndex = i * cols;
+
+            for(uint32_t c = 0; c < numClusters; c++)
+            {
+                uint32_t dist = DistanceCalculator(
+                    &centroids[c * cols],
+                    &data[pointIndex],
+                    cols);
+
+                if(dist < minDist)
+                {
+                    minDist = dist;
+                    bestCluster = c;
+                }
             }
 
-            //ACTUALIZACIÓN DE LOS CENTROIDES
-            for(uint32_t i = 0; i < numClusters; i++){
-                uint32_t cont = 0;
-                //Vector donde sumar las coordenadas de los puntos de un centroide;
-                std::vector<uint32_t>suma(cols);
-                //Para cada punto
-                for(uint32_t j; j < rows; j++){
-                    if(assignments[j] == i ){
-                        for(int l = 0; l < cols; l++){
-                            suma[l] += data[j * cols];
-
-                        }
-                        cont++;
-
-                    }
-                    //Con el vector suma de los puntos de un centroide hago la media de cada coordenada.
-                    if(cont > 0){
-                        for(uint32_t k = 0; k < cols; k++){
-                        centroids[i + k] = suma[j + k] / cont;
-                        }
-
-                    }
-                }
-
-
-                //std::cout << "Esta es la iteracion de actualización de puntos : " + i;
+            if(assignments[i] != bestCluster)
+            {
+                assignments[i] = bestCluster;
+                changes++;
             }
-            tolerance = (changes / rows) * 100;
-            iter++;
 
+            counts[bestCluster]++;
+
+            for(uint32_t d = 0; d < cols; d++)
+                sums[bestCluster * cols + d] += data[pointIndex + d];
         }
-        std::cout << "El algoritmo ha finalizado.";
-        return;
+
+        std::cout << "Cambios en esta iteracion: " << changes << "\n";
+
+        // ======================
+        // ACTUALIZAR CENTROIDES
+        // ======================
+        for(uint32_t c = 0; c < numClusters; c++)
+        {
+            if(counts[c] > 0) // Evitar división por cero
+            {
+                for(uint32_t d = 0; d < cols; d++)
+                {
+                    centroids[c * cols + d] =
+                        sums[c * cols + d] / counts[c];
+                }
+            }
+        }
+
+        // ======================
+        // CRITERIO DE PARADA 5%
+        // ======================
+        if (changes < (0.05f * rows)) break;
 
 
+        iter++;
+    }
+
+    std::cout << "\nKMeans finalizado en " << iter << " iteraciones\n";
 }
+
+
+
 
 /***********PSEUDOCÓDIGO DE K-MEANS*****************
 

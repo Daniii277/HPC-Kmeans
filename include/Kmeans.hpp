@@ -7,7 +7,7 @@ class kMeans{
         uint32_t numClusters;
         uint32_t maxIter = 2000;
         //Función para calcular la distancia entre dos puntos (Se le pasan por punteros constantes y se indican las dimensiones al obtenerlos del mismo vector d puntos).
-        float DistanceCalculator(const float* p1, const float* p2, uint32_t dim);
+        float DistanceCalculator(const float* p1, const float* p2, uint32_t cols);
 
 
     public : 

@@ -1,50 +1,60 @@
 #include <iostream>
 #include <vector>
 #include <cstdint>
+#include <ctime>
 #include "../include/Kmeans.hpp"
+#include <cstdio>
 
 int main(){
-    //Abrir el archivo binario con los datos
+
     FILE* file = fopen("../Data/datos.bin", "rb");
-    if (!file) {
-        std::cerr << "Error al abrir el archivo para lectura\n";
+
+    if(!file){
+        std::cerr << "Error al abrir el archivo\n";
         return 1;
     }
-    uint32_t nRows;
-    uint32_t nCols;
 
-    // Leer dimensiones
-    if (fread(&nRows, sizeof(uint32_t), 1, file) != 1) {
-    std::cerr << "Error leyendo nRows\n";
-    return 1;
-}
+    uint32_t nRows, nCols;
 
-if (fread(&nCols, sizeof(uint32_t), 1, file) != 1) {
-    std::cerr << "Error leyendo nCols\n";
-    return 1;
-}
-// Crear vector para los datos
-std::vector<float> data(nRows * nCols);
+    fread(&nRows, sizeof(uint32_t), 1, file);
+    fread(&nCols, sizeof(uint32_t), 1, file);
 
-//Leer la matriz
-if (fread(data.data(), sizeof(float), data.size(), file) != data.size()) {
-    std::cerr << "Error leyendo datos\n";
-    return 1;
-}
-    
-   
-    //Cerrar fichero binario
+    std::vector<float> data(nRows * nCols);
+
+    fread(data.data(), sizeof(float), data.size(), file);
+
     fclose(file);
 
-    std::vector<float> centroids(nCols);
-    std::vector<uint32_t> assignaments(nRows);
+    uint32_t k = 32;
+    kMeans kmeans(k);
 
-    kMeans k(12);
-    k.run(data, nCols, nRows, centroids, assignaments);
+    std::vector<float> centroids(k * nCols);
 
+    srand(time(NULL));
 
-    std::cout << "algoritmo finalizado";
+    for(uint32_t i = 0; i < k; i++)
+    {
+        uint32_t r = rand() % nRows;
 
+        for(uint32_t j = 0; j < nCols; j++)
+            centroids[i * nCols + j] =
+                data[r * nCols + j];
+    }
+
+    std::vector<uint32_t> assignments(nRows, UINT32_MAX);
+
+    clock_t start = clock();
+
+    kmeans.run(data, nCols, nRows, centroids, assignments);
+
+    clock_t end = clock();
+
+    double duration =
+        double(end - start) / CLOCKS_PER_SEC;
+
+    std::cout << "El algoritmo tardó "
+              << duration
+              << " segundos\n";
 
     return 0;
 }

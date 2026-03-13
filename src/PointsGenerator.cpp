@@ -30,8 +30,8 @@ int main() {
     srand((unsigned int)time(0)); // Semilla
 
 
-    int nSize = 5; // dimensiones del punto
-    int totalPoints = 1000000;
+    int nSize = 32; // dimensiones del punto
+    int totalPoints = 8000000;
 
     // Vector vacío
     std::vector<float> data;

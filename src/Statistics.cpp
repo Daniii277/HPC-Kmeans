@@ -1,15 +1,16 @@
 
 #include "../include/Statistics.hpp"
-#include <mpi>
+#include <mpi.h>
 #include <omp.h>
 #include <limits>
 #include <iostream>
 
 
-void PrintStats(const std::vector<float> &localData, uint32_t cols, int rank){
-
+void PrintStats(const std::vector<float> &localData, uint32_t nCols, int rank){
+    
+    uint32_t cols = nCols;
     uint32_t total_rows = 0;
-    uint32_t local_rows = localData.size() / cols;
+    uint32_t local_rows = localData.size() / nCols;
 
     //Calculo el total de filas (puntos) y le envío el dato a todos los nodos
     MPI_Allreduce( &local_rows , &total_rows , 1 , MPI_UINT32_T , MPI_SUM , MPI_COMM_WORLD);
@@ -62,8 +63,8 @@ void PrintStats(const std::vector<float> &localData, uint32_t cols, int rank){
     std::vector<float> global_max(cols);
     std::vector<float> global_sum(cols);
     //Con allReduce puedo obtener min y max de todos los nodos y la suma de todos los puntos.
-    MPI_Reduce( &local_min , global_min , cols , MPI_FLOAT , MPI_MIN , 0, MPI_COMM_WORLD);
-    MPI_reduce(&local_max, &global_max, cols, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce( &local_min ,&global_min , cols , MPI_FLOAT , MPI_MIN , 0, MPI_COMM_WORLD);
+    MPI_Reduce(&local_max, &global_max, cols, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
     MPI_Allreduce(&local_sum, &global_sum, cols , MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
 
     //Calculo la media
@@ -81,7 +82,8 @@ void PrintStats(const std::vector<float> &localData, uint32_t cols, int rank){
     //==================================// 
 
     std::vector<float> local_variance_sum(cols);
-    #pragma omp parallel{
+    #pragma omp parallel
+    {
 
         std::vector<float> local_thread_variance_sum(cols);
 
@@ -129,31 +131,25 @@ void PrintStats(const std::vector<float> &localData, uint32_t cols, int rank){
         //IMPRIMO MAX
         std::cout << "Valor MAX : " << std::endl;
         for(int j = 0; j < cols; j++){
-            if(i == 0) std::cout << "(";
-            std::cout << global_max[i] << "\t" ;
-            if(i == (cols -1)) std::cout << ")" << std::endl;
+            if(j == 0) std::cout << "(";
+            std::cout << global_max[j] << "\t" ;
+            if(j == (cols -1)) std::cout << ")" << std::endl;
         }
         std::cout << "================================================" << std::endl;
         //IMPRIMO MEAN
         std::cout << "Valor medio : " << std::endl;
         for(int j = 0; j < cols; j++){
-            if(i == 0) std::cout << "(";
-            std::cout << global_mean[i] << "\t" ;
-            if(i == (cols -1)) std::cout << ")" << std::endl;
+            if(j == 0) std::cout << "(";
+            std::cout << global_mean[j] << "\t" ;
+            if(j == (cols -1)) std::cout << ")" << std::endl;
         }
         std::cout << "================================================" << std::endl;
         //IMPRIMO VARIANZA
         std::cout << "Valor Varianza : " << std::endl;
         for(int j = 0; j < cols; j++){
-            if(i == 0) std::cout << "(";
-            std::cout << global_variance[i] << "\t" ;
-            if(i == (cols -1)) std::cout << ")" << std::endl ;
+            if(j == 0) std::cout << "(";
+            std::cout << global_variance[j] << "\t" ;
+            if(j == (cols -1)) std::cout << ")" << std::endl ;
         }
-
-
-
-
     }
-
-
 }

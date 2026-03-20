@@ -3,6 +3,8 @@
 #include <ctime>
 #include <iostream>
 #include <climits>
+#include <omp.h>
+#include <mpi.h> 
 
 
 kMeans::kMeans(uint32_t k): numClusters(k) {}
@@ -20,91 +22,89 @@ float kMeans::DistanceCalculator(const float* p1, const float* p2, uint32_t dim)
 
 
 
-void kMeans::run(const std::vector<float>& data, uint32_t cols, uint32_t rows,
-                 std::vector<float>& centroids, std::vector<uint32_t>& assignments)
+void kMeans::run(const std::vector<float>& data, uint32_t cols, uint32_t rows, std::vector<float>& centroids, std::vector<uint32_t>& assignments, int rank, int size)
 {
     const uint32_t maxIterations = 2000;
     uint32_t iter = 0;
-    uint32_t changes = rows;
-
-    if(assignments.size() != rows)
-        assignments.resize(rows, UINT32_MAX);
-
-    std::vector<float> sums(numClusters * cols);
-    std::vector<uint32_t> counts(numClusters);
-
-    while(iter < maxIterations)
-    {
-        std::cout << "\nIteración : " << iter << std::endl;
-
+    uint32_t changes;
+    uint32_t global_changes = 0;
+    uint32_t total_rows = assignments.size();
+    uint32_t numCentroids = centroids.size() /cols;
+    //Creo el vector local de asignaciones de cada nodo MPI.
+    std::vector<uint32_t> local_assignments(rows, UINT32_MAX);
+    //Vcetor para sumar los puntos según su centroide asignado.
+    std::vector<float> v_sum(numCentroids * cols);
+    std::vector<uint32_t> v_assignation(numCentroids);
+    //Creo los vectores de suma y asignaciones solo para el uso del nodo 0
+    std::vector<float> v_sum_global(numCentroids * cols, 0.0);
+    std::vector<uint32_t> v_assignation_global(numCentroids, 0.0);
+    
+    //Creo los centroides iniciales en el nodo 0 y los envio a los demas nodos con broadcast.
+    if(rank == 0) std::fill(centroids.begin(), centroids.end(), 0.0);
+    MPI_Bcast( centroids.data() , centroids.size() , MPI_FLOAT , 0 , MPI_COMM_WORLD);
+    //std::cout << "El nodo " << rank << "tiene : " << rows << " puntos";
+    //Bucle del algoritmo (2000 iteraciones max)
+    while(iter < maxIterations){
+        if(rank == 0) std::cout << "\nIteración : " << iter << std::endl;
         changes = 0;
+        global_changes = 0;
+        std::fill(v_sum.begin(), v_sum.end(), 0.0);
+        std::fill(v_assignation.begin(), v_assignation.end(), 0.0);
+        if(rank == 0){
+            std::fill(v_sum_global.begin(), v_sum_global.end(), 0.0);
+            std::fill(v_assignation_global.begin(), v_assignation_global.end(), 0.0);
+        }
 
-        std::fill(sums.begin(), sums.end(), 0.0f);
-        std::fill(counts.begin(), counts.end(), 0);
-
-        // ======================
-        // ASIGNACION DE CLUSTERS
-        // ======================
-        for(uint32_t i = 0; i < rows; i++)
-        {
+        //Asignación del mejor cluster para cada punto
+        for(uint32_t i = 0; i < rows; i++){
             uint32_t bestCluster = 0;
             uint32_t minDist = UINT32_MAX;
+            //Primer valor del punto correspondiente
+            uint32_t starterPointValue = i * cols;
 
-            uint32_t pointIndex = i * cols;
+            for(uint32_t j = 0; j < numCentroids; j++){
+                uint32_t dist = DistanceCalculator(&centroids[j * cols], &data[starterPointValue], cols);
 
-            for(uint32_t c = 0; c < numClusters; c++)
-            {
-                uint32_t dist = DistanceCalculator(
-                    &centroids[c * cols],
-                    &data[pointIndex],
-                    cols);
-
-                if(dist < minDist)
-                {
+                if(dist < minDist){
                     minDist = dist;
-                    bestCluster = c;
+                    bestCluster = j;
                 }
             }
 
-            if(assignments[i] != bestCluster)
-            {
-                assignments[i] = bestCluster;
+            if(local_assignments[i] != bestCluster){
+                local_assignments[i] = bestCluster;
+                for(int k = 0; k < cols; k++) v_sum[bestCluster * cols + k] += data[starterPointValue + k];
+                v_assignation[bestCluster]++;
                 changes++;
             }
-
-            counts[bestCluster]++;
-
-            for(uint32_t d = 0; d < cols; d++)
-                sums[bestCluster * cols + d] += data[pointIndex + d];
         }
+        std::cout << "Nodo " << rank << " cambios: " << changes << "\n";
+        //Uno las asignaciones,la suma de puntos por centroide y el vector del numero de puntos por centroide.
+        MPI_Gather( local_assignments.data() , rows , MPI_UINT32_T , assignments.data() , rows, MPI_UINT32_T , 0 , MPI_COMM_WORLD);
+        MPI_Reduce( v_sum.data() , v_sum_global.data() , v_sum.size() , MPI_FLOAT , MPI_SUM , 0 , MPI_COMM_WORLD);
+        MPI_Reduce( v_assignation.data() , v_assignation_global.data() , numCentroids , MPI_UINT32_T , MPI_SUM , 0 , MPI_COMM_WORLD);
+        MPI_Allreduce( &changes , &global_changes , 1 , MPI_UINT32_T , MPI_SUM , MPI_COMM_WORLD);
+        if(rank == 0) std::cout << "Cambios en esta iteracion: " << global_changes << "\n";
 
-        std::cout << "Cambios en esta iteracion: " << changes << "\n";
+        ///////////////////////////////////////
+        ////Actualización de los centroides////
+        ///////////////////////////////////////
 
-        // ======================
-        // ACTUALIZAR CENTROIDES
-        // ======================
-        for(uint32_t c = 0; c < numClusters; c++)
-        {
-            if(counts[c] > 0) // Evitar división por cero
-            {
-                for(uint32_t d = 0; d < cols; d++)
-                {
-                    centroids[c * cols + d] =
-                        sums[c * cols + d] / counts[c];
+        //El nodo 0 se encarga de la actualización de los centroides al tener el conjunto de los datos.
+        if(rank == 0){
+            for(int i = 0; i < numCentroids; i++){
+                for(int j = 0; j < cols; j++){
+                    centroids[i * cols + j] = v_sum_global[i * cols +j] / v_assignation_global[i];
                 }
             }
         }
-
-        // ======================
-        // CRITERIO DE PARADA 5%
-        // ======================
-        if (changes < (0.05f * rows)) break;
-
-
+        MPI_Bcast(centroids.data(), centroids.size(), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        //Comprobar el criterio del 5% de cambios.
+        if (global_changes < (0.05f * total_rows)) break;        
         iter++;
     }
 
-    std::cout << "\nKMeans finalizado en " << iter << " iteraciones\n";
+    if(rank == 0) std::cout << "\nKMeans finalizado en " << iter << " iteraciones\n";
 }
 
 

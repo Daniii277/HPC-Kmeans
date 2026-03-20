@@ -14,6 +14,6 @@ class kMeans{
         //CONSTRUCTOR
         kMeans(uint32_t k);
         // Función para ejecutar el algoritmo de k-means.
-        void run(const std::vector<float>& data, uint32_t cols, uint32_t rows, std::vector<float>& centroids, std::vector<uint32_t>& assignments);
+        void run(const std::vector<float>& data, uint32_t cols, uint32_t rows, std::vector<float>& centroids, std::vector<uint32_t>& assignments, int rank, int size);
 
 };

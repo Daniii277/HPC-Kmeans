@@ -31,7 +31,7 @@ int main() {
 
 
     int nSize = 32; // dimensiones del punto
-    int totalPoints = 8000000;
+    int totalPoints = 1000000;
 
     // Vector vacío
     std::vector<float> data;
